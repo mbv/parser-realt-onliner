@@ -2,10 +2,6 @@ require 'optparse'
 require 'optparse/time'
 require 'ostruct'
 require 'pp'
-require_relative 'opener'
-require_relative 'abstract_saver'
-
-
 
 class CommandLineParse
   RENT_TYPES = %w[room 1_room 2_rooms 3_rooms 4_rooms 5_rooms 6_rooms].freeze
@@ -14,11 +10,12 @@ class CommandLineParse
 
   class ScriptOptions
     attr_accessor :min_price, :max_price, :rent_types, :currency,
-                  :metro, :only_owner, :format
+                  :metro, :only_owner, :format, :path
 
     def initialize
       self.currency = 'usd'
       self.format = 'csv'
+      self.path = 'file.csv'
     end
 
     def define_options(parser)
@@ -87,6 +84,13 @@ class CommandLineParse
         self.format = format
       end
     end
+
+    def path_option(parser)
+      parser.on('-p file.csv', '--path file.csv', String,
+                'Enter output file path') do |path|
+        self.path = path
+      end
+    end
   end
 
   def parse(args)
@@ -100,11 +104,3 @@ class CommandLineParse
 
   attr_reader :options
 end
-
-example = CommandLineParse.new
-options = example.parse(ARGV)
-pp options
-
-result = Opener.new(options).start
-CsvSaver.new('file.csv').save result
-JsonSaver.new('file.json').save result
