@@ -27,6 +27,7 @@ class CommandLineParse
       max_price_option(parser)
       currency_option(parser)
       rent_types_option(parser)
+      metro_option(parser)
       owner_option(parser)
       format_option(parser)
 

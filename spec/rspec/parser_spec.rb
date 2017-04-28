@@ -1,7 +1,6 @@
 require 'spec_helper'
 require 'parser'
 
-
 RSpec.describe Parser do
   describe '#parse_html' do
     let(:input_file) { File.expand_path('../fixtures/input', File.dirname(__FILE__)) }

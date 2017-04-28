@@ -58,11 +58,9 @@ class Opener
 
   def fetch_apartments(urls)
     threads = []
-    i       = 0
     urls.each do |url|
-      threads[i] = Thread.new { Thread.current[:apartments] = Parser.new.parse(url); puts i }
+      threads << Thread.new { Thread.current[:apartments] = Parser.new.parse(url) }
       sleep(0.1)
-      i += 1
     end
     apartments = []
     threads.each do |t|
