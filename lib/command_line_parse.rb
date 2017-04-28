@@ -106,5 +106,5 @@ options = example.parse(ARGV)
 pp options
 
 result = Opener.new(options).start
-CsvSaver.new.save result
-JsonSaver.new.save result
+CsvSaver.new('file.csv').save result
+JsonSaver.new('file.json').save result

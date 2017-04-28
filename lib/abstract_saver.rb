@@ -2,6 +2,11 @@ require 'json'
 require 'csv'
 
 class AbstractSaver
+
+  def initialize(path)
+    @path = path
+  end
+
   def save(_)
     throw NotImplementedError
   end
@@ -9,7 +14,7 @@ end
 
 class JsonSaver < AbstractSaver
   def save(apartments)
-    File.open('temp.json', 'w') do |f|
+    File.open(@path, 'w') do |f|
       f.write(apartments.to_json)
     end
   end
@@ -27,7 +32,13 @@ class CsvSaver < AbstractSaver
                      'Air conditioning'].freeze
 
 
-  COLUMNS = (['Address', 'Price'] + COLUMNS_OPTIONS).freeze
+  COLUMNS = (['Address',
+              'Price Primary',
+              'Price Secondary',
+              'Apartment Type',
+              'Advert Type',
+              'Description',
+              'Phones'] + COLUMNS_OPTIONS).freeze
 
 
   MAPPING = { 'Furniture'         => 'Мебель',
@@ -49,7 +60,12 @@ class CsvSaver < AbstractSaver
   def format_apartment(apartment)
     row = []
     row << apartment[:address]
-    row << apartment[:price]
+    row << apartment[:price_primary]
+    row << apartment[:price_secondary]
+    row << apartment[:apartment_type]
+    row << apartment[:advert_type]
+    row << apartment[:description]
+    row << apartment[:phones]
     COLUMNS_OPTIONS.each do |option_name|
       row << (contains_in_apartment?(apartment, option_name) ? '+' : '-')
     end
@@ -57,7 +73,7 @@ class CsvSaver < AbstractSaver
   end
 
   def save(apartments)
-    CSV.open('myfile.csv', "w") do |csv|
+    CSV.open(@path, 'w') do |csv|
       csv << COLUMNS
       apartments.each do |apartment|
         csv << format_apartment(apartment)
