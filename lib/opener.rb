@@ -25,6 +25,7 @@ class Opener
   JSON_NAME_LAST       = 'last'.freeze
   JSON_NAME_APARTMENTS = 'apartments'.freeze
   JSON_NAME_URL        = 'url'.freeze
+  JSON_NAME_ERRORS     = 'errors'.freeze
 
   def initialize(params)
     @url_generator = UrlGenerator.new(params)
@@ -46,8 +47,13 @@ class Opener
     apartments_urls = []
     puts @url_generator.url_with_page 1
     first_page_content = get_json_by_url @url_generator.url_with_page 1
-    #TODO fetch errors
-    all_count_pages    = first_page_content[JSON_NAME_PAGE][JSON_NAME_LAST]
+
+    return apartments_urls if first_page_content.key? JSON_NAME_ERRORS
+
+    all_count_pages = first_page_content[JSON_NAME_PAGE][JSON_NAME_LAST]
+
+    apartments_urls.concat parse_apartments(first_page_content)
+
     (2..all_count_pages).each do |page|
       page_content = get_json_by_url @url_generator.url_with_page page
       apartments_urls.concat parse_apartments(page_content)
