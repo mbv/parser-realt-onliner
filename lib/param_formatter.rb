@@ -8,8 +8,14 @@ class ParamFormatter
   end
 
   def params
-    @params ||= {}.merge(prices).merge(rent_type).merge(only_owner)
-                  .merge(bounds).merge(currency).merge(metro)
+    @params ||= {
+        **prices,
+        **rent_type,
+        **only_owner,
+        **bounds,
+        **currency,
+        **metro
+    }
   end
 
   def prices

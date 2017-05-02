@@ -1,7 +1,75 @@
 require 'active_support/core_ext/hash'
 require 'net/http'
 require 'json'
+require 'dry-container'
+require 'dry-monads'
+require 'dry-transaction'
 require_relative 'parser'
+require_relative 'getter_pages'
+
+class ParserHelper
+
+  JSON_NAME_APARTMENTS = 'apartments'.freeze
+  JSON_NAME_URL        = 'url'.freeze
+
+  def self.parse_apartments(content)
+    content[JSON_NAME_APARTMENTS].map do |apartment|
+      apartment[JSON_NAME_URL]
+    end
+  end
+
+  def self.fetch_apartments(urls)
+    threads = []
+    urls.each do |url|
+      threads << Thread.new { Thread.current[:result] = Parser.new.parse(url) }
+      sleep(0.1)
+    end
+    threads.map do |t|
+      t.join
+      t[:result]
+    end
+  end
+end
+
+class ParserContainer
+  extend Dry::Container::Mixin
+
+  JSON_NAME_PAGE   = 'page'.freeze
+  JSON_NAME_LAST   = 'last'.freeze
+  JSON_NAME_ERRORS = 'errors'.freeze
+
+  register :first_page, (->(input) do
+    url  = input[:url_generator].url_with_page(1)
+    page = input[:getter_pages].get_json(url)
+    if page.key? JSON_NAME_ERRORS
+      Dry::Monads.Left(error: 'Bad params', errors: page[JSON_NAME_ERRORS])
+    else
+      Dry::Monads.Right(page: page, **input)
+    end
+  end)
+  register :all_json_pages, (->(input) do
+    pages           = [input[:page]]
+    all_count_pages = input[:page][JSON_NAME_PAGE][JSON_NAME_LAST]
+    (2..all_count_pages).each do |page_number|
+      url = input[:url_generator].url_with_page(page_number)
+      pages << input[:getter_pages].get_json(url)
+    end
+    Dry::Monads.Right(pages: pages)
+  end)
+
+  register :get_apartment_urls, (->(input) do
+    urls = []
+    input[:pages].each do |page|
+      urls.concat ParserHelper.parse_apartments(page)
+    end
+    Dry::Monads.Right(urls: urls)
+  end)
+
+  register :fetch_apartments, (->(input) do
+    apartments = ParserHelper.fetch_apartments(input[:urls])
+    Dry::Monads.Right(apartments: apartments)
+  end)
+end
 
 class UrlGenerator
   BASE_URL = 'https://ak.api.onliner.by/search/apartments?'.freeze
@@ -20,60 +88,19 @@ class UrlGenerator
 end
 
 class Opener
-
-  JSON_NAME_PAGE       = 'page'.freeze
-  JSON_NAME_LAST       = 'last'.freeze
-  JSON_NAME_APARTMENTS = 'apartments'.freeze
-  JSON_NAME_URL        = 'url'.freeze
-  JSON_NAME_ERRORS     = 'errors'.freeze
-
-  def initialize(params)
+  def initialize(params, getter_pages = GetterPages.new)
     @url_generator = UrlGenerator.new(params)
-  end
-
-  def get_json_by_url(url)
-    uri      = URI(url)
-    response = Net::HTTP.get(uri)
-    JSON.parse(response)
-  end
-
-  def parse_apartments(content)
-    content[JSON_NAME_APARTMENTS].map do |apartment|
-      apartment[JSON_NAME_URL]
+    @getter_pages  = getter_pages
+    @parser        = Dry.Transaction(container: ParserContainer) do
+      step :first_page
+      step :all_json_pages
+      step :get_apartment_urls
+      step :fetch_apartments
     end
   end
 
   def start
-    apartments_urls = []
-    puts @url_generator.url_with_page 1
-    first_page_content = get_json_by_url @url_generator.url_with_page 1
-
-    return apartments_urls if first_page_content.key? JSON_NAME_ERRORS
-
-    all_count_pages = first_page_content[JSON_NAME_PAGE][JSON_NAME_LAST]
-
-    apartments_urls.concat parse_apartments(first_page_content)
-
-    (2..all_count_pages).each do |page|
-      page_content = get_json_by_url @url_generator.url_with_page page
-      apartments_urls.concat parse_apartments(page_content)
-    end
-
-    fetch_apartments apartments_urls
+    @parser.call(url_generator: @url_generator,
+                 getter_pages:  @getter_pages)
   end
-
-  def fetch_apartments(urls)
-    threads = []
-    urls.each do |url|
-      threads << Thread.new { Thread.current[:apartments] = Parser.new.parse(url) }
-      sleep(0.1)
-    end
-    apartments = []
-    threads.each do |t|
-      t.join
-      apartments << t[:apartments]
-    end
-    apartments
-  end
-
 end

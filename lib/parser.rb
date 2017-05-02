@@ -1,5 +1,6 @@
 require 'nokogiri'
 require 'open-uri'
+require_relative 'getter_pages'
 
 class Parser
   CSS_MIDDLE_BLOCK          = 'div.g-middle'.freeze
@@ -19,9 +20,13 @@ class Parser
 
   HTML_TAG_ATTRIBUTE_CLASS = 'class'.freeze
 
+  def initialize(getter_pages = GetterPages.new)
+    @getter_pages = getter_pages
+  end
+
 
   def parse(url)
-    page = Nokogiri::HTML(open(url))
+    page = Nokogiri::HTML(@getter_pages.get_page(url))
 
     middle_block = page.css(CSS_MIDDLE_BLOCK)
 
@@ -43,8 +48,8 @@ class Parser
     description = apartment_info.css(CSS_DESCRIPTION).text.strip
     options     = parse_apartment_options apartment_info
 
-    phones = customer_info.css(CSS_CUSTOMER_PHONE).map { |phone| phone.text.strip}
-                          .join(', ')
+    phones = customer_info.css(CSS_CUSTOMER_PHONE)
+                          .map { |phone| phone.text.strip }.join(', ')
 
     { price_primary:   price_primary,
       price_secondary: price_secondary,
