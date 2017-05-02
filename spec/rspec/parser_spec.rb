@@ -2,6 +2,12 @@ require 'spec_helper'
 require 'parser'
 
 RSpec.describe Parser do
+  class FakeGetterPages
+    def get_page(url)
+      open(url)
+    end
+  end
+
   describe '#parse_html' do
     let(:input_file) { File.expand_path('../fixtures/input', File.dirname(__FILE__)) }
     let(:expected_hash) do
@@ -22,7 +28,7 @@ RSpec.describe Parser do
                           { name: 'Лоджия или балкон', contains: true },
                           { name: 'Кондиционер', contains: false }] }
     end
-    subject(:parsed_hash) { described_class.new.parse(input_file) }
+    subject(:parsed_hash) { described_class.new(FakeGetterPages.new).parse(input_file) }
 
     it 'should parse html' do
       expect(parsed_hash).to include(expected_hash)
