@@ -18,10 +18,10 @@ class ParserHelper
     end
   end
 
-  def self.fetch_apartments(urls)
+  def self.fetch_apartments(parser, urls)
     threads = []
     urls.each do |url|
-      threads << Thread.new { Thread.current[:result] = Parser.new.parse(url) }
+      threads << Thread.new { Thread.current[:result] = parser.parse(url) }
       sleep(0.1)
     end
     threads.map do |t|
@@ -54,7 +54,7 @@ class ParserContainer
       url = input[:url_generator].url_with_page(page_number)
       pages << input[:getter_pages].get_json(url)
     end
-    Dry::Monads.Right(pages: pages)
+    Dry::Monads.Right(pages: pages, parser_apartment: input[:parser_apartment])
   end)
 
   register :get_apartment_urls, (->(input) do
@@ -62,11 +62,11 @@ class ParserContainer
     input[:pages].each do |page|
       urls.concat ParserHelper.parse_apartments(page)
     end
-    Dry::Monads.Right(urls: urls)
+    Dry::Monads.Right(urls: urls, parser_apartment: input[:parser_apartment])
   end)
 
   register :fetch_apartments, (->(input) do
-    apartments = ParserHelper.fetch_apartments(input[:urls])
+    apartments = ParserHelper.fetch_apartments(input[:parser_apartment], input[:urls])
     Dry::Monads.Right(apartments: apartments)
   end)
 end
@@ -88,19 +88,21 @@ class UrlGenerator
 end
 
 class Opener
-  def initialize(params, getter_pages = GetterPages.new)
-    @url_generator = UrlGenerator.new(params)
-    @getter_pages  = getter_pages
-    @parser        = Dry.Transaction(container: ParserContainer) do
+  def initialize(params, getter_pages = GetterPages.new, parser_apartment = Parser.new)
+    @url_generator    = UrlGenerator.new(params)
+    @getter_pages     = getter_pages
+    @parser           = Dry.Transaction(container: ParserContainer) do
       step :first_page
       step :all_json_pages
       step :get_apartment_urls
       step :fetch_apartments
     end
+    @parser_apartment = parser_apartment
   end
 
   def start
-    @parser.call(url_generator: @url_generator,
-                 getter_pages:  @getter_pages)
+    @parser.call(url_generator:    @url_generator,
+                 getter_pages:     @getter_pages,
+                 parser_apartment: @parser_apartment)
   end
 end

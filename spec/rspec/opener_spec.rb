@@ -42,11 +42,16 @@ RSpec.describe ParserContainer do
       URL
     end
   end
+
   before(:all) do
-    @bad_getter_pages   = BadGetterPages.new
-    @good_getter_pages  = GoodGetterPages.new
-    @fake_url_generator = FakeUrlGenerator.new
+    @bad_getter_pages     = BadGetterPages.new
+    @good_getter_pages    = GoodGetterPages.new
+    @fake_url_generator   = FakeUrlGenerator.new
+    @fake_page            = { 'page' => { 'last' => 1 } }
+    @fake_page_with_2_all = { 'page' => { 'last' => 2 } }
+    @good_page_for_return = @good_getter_pages.get_json nil
   end
+
   describe '#first_page' do
     let(:input_bad_params) do
       { getter_pages:  @bad_getter_pages,
@@ -61,7 +66,7 @@ RSpec.describe ParserContainer do
         errors: 'error' }
     end
     let(:expected_good_result) do
-      { page:          {},
+      { page:          @good_page_for_return,
         getter_pages:  @good_getter_pages,
         url_generator: @fake_url_generator }
     end
@@ -76,4 +81,72 @@ RSpec.describe ParserContainer do
     end
 
   end
+
+  describe '#all_json_pages' do
+    let(:input_one_page) do
+      { page:          @fake_page,
+        getter_pages:  @good_getter_pages,
+        url_generator: @fake_url_generator }
+    end
+    let(:input_two_page) do
+      { page:          @fake_page_with_2_all,
+        getter_pages:  @good_getter_pages,
+        url_generator: @fake_url_generator }
+    end
+    let(:exp_result_one_page) do
+      { pages:            [@fake_page],
+        parser_apartment: nil }
+    end
+    let(:exp_result_two_pages) do
+      { pages:            [@fake_page_with_2_all, @good_page_for_return],
+        parser_apartment: nil }
+    end
+    all_json_pages_step = ParserContainer.resolve(:all_json_pages)
+    it 'should return one page' do
+      expect(all_json_pages_step.call(input_one_page).value).to eq(exp_result_one_page)
+    end
+    it 'should return two pages' do
+      expect(all_json_pages_step.call(input_two_page).value).to eq(exp_result_two_pages)
+    end
+  end
+  describe '#get_apartment_urls' do
+    good_page_with_apartments = { 'apartments' => [{ 'url' => 'url1' },
+                                                   { 'url' => 'url2' }] }
+    let(:input) do
+      { pages: [good_page_with_apartments, good_page_with_apartments] }
+    end
+
+    let(:exp_urls) do
+      { urls:             ['url1', 'url2', 'url1', 'url2'],
+        parser_apartment: nil }
+    end
+
+    all_json_pages_step = ParserContainer.resolve(:get_apartment_urls)
+
+    it 'should return urls from two pages' do
+      expect(all_json_pages_step.call(input).value).to eq(exp_urls)
+    end
+  end
+  describe '#fetch_apartments' do
+    class FakeParser
+      def parse(url)
+        { url: url }
+      end
+    end
+    let(:input) do
+      { urls:             ['url1', 'url2'],
+        parser_apartment: FakeParser.new }
+    end
+    let(:exp_result) do
+      { apartments: [{ url: 'url1'},
+                     { url: 'url2'}] }
+    end
+
+    fetch_apartments_step = ParserContainer.resolve(:fetch_apartments)
+
+    it 'should return parsed pages' do
+      expect(fetch_apartments_step.call(input).value).to eq(exp_result)
+    end
+  end
+
 end
